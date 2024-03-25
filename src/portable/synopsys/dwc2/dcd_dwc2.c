@@ -121,6 +121,10 @@ static void update_grxfsiz(uint8_t rhport) {
   dwc2->grxfsiz = calc_grxfsiz(max_epsize, ep_count);
 }
 
+#if CFG_TUSB_USB3340_PHY
+#include "cihal/cusb.h" 
+static bool suspended = false;
+#endif
 // Start of Bus Reset
 static void bus_reset(uint8_t rhport) {
   dwc2_regs_t* dwc2 = DWC2_REG(rhport);
@@ -328,6 +332,10 @@ static void phy_fs_init(dwc2_regs_t* dwc2) {
 
   // set max speed
   dwc2->dcfg = (dwc2->dcfg & ~DCFG_DSPD_Msk) | (DCFG_DSPD_FS << DCFG_DSPD_Pos);
+#if CFG_TUSB_USB3340_PHY
+    // Enable delay to default timing, necessary for some ULPI PHYs
+  dwc2->dcfg |= (1 << 14); // Set XCVRDLY to 1
+#endif
 }
 
 static void phy_hs_init(dwc2_regs_t* dwc2) {
@@ -383,6 +391,10 @@ static void phy_hs_init(dwc2_regs_t* dwc2) {
   uint32_t dcfg = dwc2->dcfg;
   dcfg &= ~DCFG_DSPD_Msk;
   dcfg |= DCFG_DSPD_HS << DCFG_DSPD_Pos;
+#if CFG_TUSB_USB3340_PHY
+    // Enable delay to default timing, necessary for some ULPI PHYs
+  dcfg |= (1 << 14); // Set XCVRDLY to 1
+#endif
 
   // XCVRDLY: transceiver delay between xcvr_sel and txvalid during device chirp is required
   // when using with some PHYs such as USB334x (USB3341, USB3343, USB3346, USB3347)
@@ -426,6 +438,12 @@ void dcd_init(uint8_t rhport) {
 
   // Restart PHY clock
   dwc2->pcgctl &= ~(PCGCTL_STOPPCLK | PCGCTL_GATEHCLK | PCGCTL_PWRCLMP | PCGCTL_RSTPDWNMODULE);
+
+#if CFG_TUSB_USB3340_PHY
+  if(cusb_ulpi_sanity_check() != 0){
+    cusb_reset(true);
+  }
+#endif
 
   /* Set HS/FS Timeout Calibration to 7 (max available value).
    * The number of PHY clocks that the application programs in
@@ -1107,6 +1125,11 @@ void dcd_int_handler(uint8_t rhport) {
   }
 
   if (int_status & GINTSTS_USBSUSP) {
+#if CFG_TUSB_USB3340_PHY
+    if(!suspended){
+      suspended = true;
+    }
+#endif
     dwc2->gintsts = GINTSTS_USBSUSP;
     dcd_event_bus_signal(rhport, DCD_EVENT_SUSPEND, true);
   }

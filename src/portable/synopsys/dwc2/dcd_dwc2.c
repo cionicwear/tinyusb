@@ -317,7 +317,7 @@ static void phy_fs_init(dwc2_regs_t* dwc2) {
   dwc2->gusbcfg |= GUSBCFG_PHYSEL;
 
   // MCU specific PHY init before reset
-  dwc2_phy_init(dwc2, HS_PHY_TYPE_NONE);
+  dwc2_phy_init(dwc2, HS_PHY_TYPE_ULPI);
 
   // Reset core after selecting PHY
   reset_core(dwc2);
@@ -328,14 +328,10 @@ static void phy_fs_init(dwc2_regs_t* dwc2) {
   dwc2->gusbcfg = (dwc2->gusbcfg & ~GUSBCFG_TRDT_Msk) | (5u << GUSBCFG_TRDT_Pos);
 
   // MCU specific PHY update post reset
-  dwc2_phy_update(dwc2, HS_PHY_TYPE_NONE);
+  dwc2_phy_update(dwc2, HS_PHY_TYPE_ULPI);
 
   // set max speed
   dwc2->dcfg = (dwc2->dcfg & ~DCFG_DSPD_Msk) | (DCFG_DSPD_FS << DCFG_DSPD_Pos);
-#if CFG_TUSB_USB3340_PHY
-    // Enable delay to default timing, necessary for some ULPI PHYs
-  dwc2->dcfg |= (1 << 14); // Set XCVRDLY to 1
-#endif
 }
 
 static void phy_hs_init(dwc2_regs_t* dwc2) {
@@ -391,10 +387,6 @@ static void phy_hs_init(dwc2_regs_t* dwc2) {
   uint32_t dcfg = dwc2->dcfg;
   dcfg &= ~DCFG_DSPD_Msk;
   dcfg |= DCFG_DSPD_HS << DCFG_DSPD_Pos;
-#if CFG_TUSB_USB3340_PHY
-    // Enable delay to default timing, necessary for some ULPI PHYs
-  dcfg |= (1 << 14); // Set XCVRDLY to 1
-#endif
 
   // XCVRDLY: transceiver delay between xcvr_sel and txvalid during device chirp is required
   // when using with some PHYs such as USB334x (USB3341, USB3343, USB3346, USB3347)
